@@ -151,12 +151,22 @@ Panel {
   }
 
   function open() {
+    diffView = false
+    cursorActive = true
+    fileIndex = 0
     refresh()
     controller.show()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
   function close() { controller.hide() }
   function toggle() { opened ? close() : open() }
+
+  onOpenedChanged: if (opened) {
+    diffView = false
+    cursorActive = true
+    fileIndex = 0
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
 
   IpcHandler {
     target: "qs-yadm"
