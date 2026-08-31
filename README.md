@@ -60,6 +60,7 @@ o.bind("SUPER + CTRL + Y", "Yadm", "omarchy-shell shell toggle qs-yadm")
 | Left-click file | Commit that file and push in the background |
 | Left-click checkbox | Toggle that file in the batch selection |
 | Ctrl + left-click files | Toggle batch selection |
+| Space | Toggle the focused file in the batch selection |
 | Enter | Commit selected files together, or commit the focused file |
 | Right-click file / `d` | Open its diff viewer |
 | Arrow keys | Move through changed files |

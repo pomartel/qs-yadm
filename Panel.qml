@@ -32,6 +32,7 @@ Panel {
   property real lastSyncAt: 0
   property int fileIndex: 0
   property bool cursorActive: false
+  property bool suppressNextActivate: false
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
@@ -136,11 +137,18 @@ Panel {
   }
 
   function activateCurrent() {
+    if (diffView) return
     if (selectedIds.length > 0) {
       enqueueCommit(selectedIds.slice())
       return
     }
     if (visibleFiles.length > 0) enqueueCommit([visibleFiles[Math.max(0, Math.min(fileIndex, visibleFiles.length - 1))].id])
+  }
+
+  function toggleCurrentSelection() {
+    if (diffView || visibleFiles.length === 0) return
+    var index = Math.max(0, Math.min(fileIndex, visibleFiles.length - 1))
+    toggleSelected(visibleFiles[index].id)
   }
 
   function open() {
@@ -233,7 +241,17 @@ Panel {
         root.cursorActive = true
         root.fileIndex = Math.max(0, Math.min(root.visibleFiles.length - 1, root.fileIndex + dy))
       }
-      onActivateRequested: root.activateCurrent()
+      // PanelKeyCatcher emits returnRequested and activateRequested for Enter,
+      // but only activateRequested for Space. Suppress the second Enter signal
+      // so Enter commits while Space remains a pure selection toggle.
+      onReturnRequested: {
+        root.suppressNextActivate = true
+        root.activateCurrent()
+      }
+      onActivateRequested: {
+        if (root.suppressNextActivate) root.suppressNextActivate = false
+        else root.toggleCurrentSelection()
+      }
       onCloseRequested: {
         if (root.diffView) root.diffView = false
         else root.close()
