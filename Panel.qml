@@ -480,13 +480,35 @@ Panel {
                       font.pixelSize: Style.font.body
                       elide: Text.ElideMiddle
                     }
-                    Text {
+                    RowLayout {
                       Layout.fillWidth: true
-                      text: String(fileRow.modelData.status) + "  +" + fileRow.modelData.added + "  −" + fileRow.modelData.deleted
-                        + (fileRow.modelData.binary ? "  binary" : "")
-                      color: root.dim
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
+                      spacing: Style.space(6)
+
+                      Text {
+                        text: String(fileRow.modelData.status)
+                        color: root.dim
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
+                      Text {
+                        text: "+" + fileRow.modelData.added
+                        color: "#6aa56a"
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
+                      Text {
+                        text: "−" + fileRow.modelData.deleted
+                        color: root.urgent
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
+                      Text {
+                        visible: fileRow.modelData.binary === true
+                        text: "binary"
+                        color: root.dim
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
                     }
                   }
                   Text {
