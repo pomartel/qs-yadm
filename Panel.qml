@@ -32,7 +32,6 @@ Panel {
   property real lastSyncAt: 0
   property int fileIndex: 0
   property bool cursorActive: false
-  property bool suppressNextActivate: false
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
@@ -233,40 +232,67 @@ Panel {
     contentWidth: panel.fittedContentWidth(Style.space(root.diffView ? 640 : 400))
     contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight, Style.space(600))
 
-    PanelKeyCatcher {
+    Item {
       id: keyCatcher
       anchors.fill: parent
-      onMoveRequested: function(dx, dy) {
-        if (root.diffView) {
-          if (dx < 0) root.diffView = false
+      focus: true
+      Keys.priority: Keys.BeforeItem
+      Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Escape) {
+          if (root.diffView) root.diffView = false
+          else root.close()
+          event.accepted = true
           return
         }
-        root.cursorActive = true
-        if (dx > 0 && root.visibleFiles.length > 0) {
+        if (event.key === Qt.Key_Down || event.text === "j") {
+          if (!root.diffView) {
+            root.cursorActive = true
+            root.fileIndex = Math.max(0, Math.min(root.visibleFiles.length - 1, root.fileIndex + 1))
+          }
+          event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_Up || event.text === "k") {
+          if (!root.diffView) {
+            root.cursorActive = true
+            root.fileIndex = Math.max(0, Math.min(root.visibleFiles.length - 1, root.fileIndex - 1))
+          }
+          event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_Right || event.text === "l") {
+          if (!root.diffView && root.visibleFiles.length > 0) {
+            root.cursorActive = true
+            root.showDiff(root.visibleFiles[Math.max(0, Math.min(root.fileIndex, root.visibleFiles.length - 1))].id)
+          }
+          event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_Left || event.text === "h") {
+          if (root.diffView) root.diffView = false
+          event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+          root.activateCurrent()
+          event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_Space) {
+          root.toggleCurrentSelection()
+          event.accepted = true
+          return
+        }
+        if (event.text === "r" || event.text === "R") {
+          root.sync()
+          event.accepted = true
+          return
+        }
+        if ((event.text === "d" || event.text === "D") && !root.diffView && root.visibleFiles.length > 0) {
           root.showDiff(root.visibleFiles[Math.max(0, Math.min(root.fileIndex, root.visibleFiles.length - 1))].id)
+          event.accepted = true
           return
         }
-        root.fileIndex = Math.max(0, Math.min(root.visibleFiles.length - 1, root.fileIndex + dy))
-      }
-      // PanelKeyCatcher emits returnRequested and activateRequested for Enter,
-      // but only activateRequested for Space. Suppress the second Enter signal
-      // so Enter commits while Space remains a pure selection toggle.
-      onReturnRequested: {
-        root.suppressNextActivate = true
-        root.activateCurrent()
-      }
-      onActivateRequested: {
-        if (root.suppressNextActivate) root.suppressNextActivate = false
-        else root.toggleCurrentSelection()
-      }
-      onCloseRequested: {
-        if (root.diffView) root.diffView = false
-        else root.close()
-      }
-      onTextKey: function(t) {
-        if (t === "r" || t === "R") root.sync()
-        else if ((t === "d" || t === "D") && !root.diffView && root.visibleFiles.length > 0)
-          root.showDiff(root.visibleFiles[root.fileIndex].id)
       }
 
       Flickable {
