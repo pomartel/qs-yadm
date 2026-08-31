@@ -197,6 +197,14 @@ Panel {
     toggleSelected(visibleFiles[index].id)
   }
 
+  function openCurrentFile() {
+    if (diffView || visibleFiles.length === 0) return
+    var index = Math.max(0, Math.min(fileIndex, visibleFiles.length - 1))
+    var path = homeDir + "/" + String(visibleFiles[index].path)
+    close()
+    Quickshell.execDetached(["omarchy", "launch", "editor", path])
+  }
+
   function open() {
     diffView = false
     cursorActive = true
@@ -342,6 +350,11 @@ Panel {
         }
         if (event.text === "r" || event.text === "R") {
           root.sync()
+          event.accepted = true
+          return
+        }
+        if ((event.text === "o" || event.text === "O") && !root.diffView) {
+          root.openCurrentFile()
           event.accepted = true
           return
         }
