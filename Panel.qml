@@ -50,6 +50,11 @@ Panel {
     return result
   }
   readonly property int changedCount: visibleFiles.length
+  readonly property string syncStatus: ahead > 0 && behind > 0
+    ? (ahead + " ahead · " + behind + " behind")
+    : ahead > 0 ? (ahead + " ahead")
+    : behind > 0 ? (behind + " behind")
+    : "Synced"
 
   function parse(text) {
     try { return JSON.parse(String(text || "{}")) }
@@ -412,7 +417,7 @@ Panel {
             spacing: Style.space(12)
             Text { text: "+" + root.added; color: "#6aa56a"; font.family: root.fontFamily; font.pixelSize: Style.font.body }
             Text { text: "−" + root.deleted; color: root.urgent; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-            Text { text: root.ahead > 0 ? (root.ahead + " ahead") : "Synced"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body; Layout.fillWidth: true }
+            Text { text: root.syncStatus; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body; Layout.fillWidth: true }
             PanelActionButton {
               iconText: "󰑓"
               foreground: root.foreground
