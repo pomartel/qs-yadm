@@ -19,6 +19,7 @@ Panel {
   property var pendingIds: []
   property var commitQueue: []
   property var activeCommitIds: []
+  property var activeDiscardIds: []
   property var settlingIds: []
   property var diffData: ({})
   property bool diffView: false
@@ -141,14 +142,37 @@ Panel {
 
   function finishCommit() {
     var completed = activeCommitIds.slice()
+    settleCompleted(completed)
+    activeCommitIds = []
+    refresh()
+    Qt.callLater(startNextCommit)
+  }
+
+  function settleCompleted(completed) {
     var settling = settlingIds.slice()
     for (var i = 0; i < completed.length; i++)
       if (settling.indexOf(completed[i]) === -1) settling.push(completed[i])
     settlingIds = settling
     settleAfterGeneration = statusGeneration + 1
-    activeCommitIds = []
+  }
+
+  function discardCurrent() {
+    if (diffView || discardProcess.running || visibleFiles.length === 0) return
+    var index = Math.max(0, Math.min(fileIndex, visibleFiles.length - 1))
+    var id = visibleFiles[index].id
+    if (pendingIds.indexOf(id) !== -1) return
+    activeDiscardIds = [id]
+    pendingIds = pendingIds.concat([id])
+    selectedIds = selectedIds.filter(function(selectedId) { return selectedId !== id })
+    discardProcess.command = ["python3", backendPath, "discard", id]
+    discardProcess.running = true
+  }
+
+  function finishDiscard() {
+    var completed = activeDiscardIds.slice()
+    settleCompleted(completed)
+    activeDiscardIds = []
     refresh()
-    Qt.callLater(startNextCommit)
   }
 
   function showDiff(id) {
@@ -323,6 +347,11 @@ Panel {
         }
         if ((event.text === "d" || event.text === "D") && !root.diffView && root.visibleFiles.length > 0) {
           root.showDiff(root.visibleFiles[Math.max(0, Math.min(root.fileIndex, root.visibleFiles.length - 1))].id)
+          event.accepted = true
+          return
+        }
+        if ((event.text === "x" || event.text === "X") && !root.diffView) {
+          root.discardCurrent()
           event.accepted = true
           return
         }
@@ -620,6 +649,16 @@ Panel {
       var data = root.parse(commitOutput.text)
       if (data.ok !== true) root.errorText = String(data.error || "Yadm commit failed")
       root.finishCommit()
+    }
+  }
+  Process {
+    id: discardProcess
+    command: []
+    stdout: StdioCollector { id: discardOutput; waitForEnd: true }
+    onExited: function(exitCode) {
+      var data = root.parse(discardOutput.text)
+      if (data.ok !== true) root.errorText = String(data.error || "Could not discard yadm changes")
+      root.finishDiscard()
     }
   }
   Process {

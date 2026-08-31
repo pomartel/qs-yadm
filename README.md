@@ -63,6 +63,7 @@ o.bind("SUPER + CTRL + Y", "Yadm", "omarchy-shell shell toggle qs-yadm")
 | Space | Toggle the focused file in the batch selection |
 | Enter | Commit selected files together, or commit the focused file |
 | Right-click file / `d` | Open its diff viewer |
+| `x` | Discard the focused file's changes after saving a recovery patch |
 | Up / Down | Move through changed files |
 | Right | Open the focused file's diff |
 | Left | Return from the diff to the file list |
@@ -108,6 +109,10 @@ Transient errors and lock files live in:
 ```text
 ~/.local/state/omarchy/qs-yadm/
 ```
+
+Before `x` restores a file to `HEAD`, its complete binary-capable diff is saved
+with mode `0600` under `~/.local/state/omarchy/qs-yadm/discarded/`. A discarded
+change can be recovered with `yadm apply /path/to/the.patch`.
 
 ## Troubleshooting
 

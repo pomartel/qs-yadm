@@ -328,6 +328,34 @@ def sync_repo() -> dict[str, Any]:
         return {"ok": True, "lastSyncAt": now}
 
 
+def discard_ids(ids: list[str]) -> dict[str, Any]:
+    with RepoLock():
+        paths = resolve_ids(ids)
+        if not paths:
+            return {"ok": True, "skipped": True, "message": "Files are already clean"}
+        patch = yadm("diff", "HEAD", "--binary", "--full-index", "--", *paths).stdout
+        if not patch:
+            return {"ok": True, "skipped": True, "message": "Files are already clean"}
+
+        discard_dir = STATE_DIR / "discarded"
+        discard_dir.mkdir(parents=True, exist_ok=True)
+        label = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(paths[0]).name).strip("-") or "changes"
+        stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{time.time_ns() % 1_000_000_000:09d}"
+        backup = discard_dir / f"{stamp}-{label}.patch"
+        backup.write_text(patch)
+        backup.chmod(0o600)
+
+        restore = yadm(
+            "restore", "--source=HEAD", "--staged", "--worktree", "--", *paths,
+            check=False,
+        )
+        if restore.returncode:
+            detail = (restore.stderr or restore.stdout or "Could not discard changes").strip()
+            raise BackendError(f"{detail}. Recovery patch: {backup}")
+        save_state(error="", errorAt=0)
+        return {"ok": True, "discarded": True, "backup": str(backup)}
+
+
 def diff_payload(entry_id: str) -> dict[str, Any]:
     matching = [entry for entry in porcelain_entries() if entry["id"] == entry_id]
     if not matching:
@@ -365,6 +393,8 @@ def main() -> int:
     sub.add_parser("status")
     commit = sub.add_parser("commit")
     commit.add_argument("ids", nargs="+")
+    discard = sub.add_parser("discard")
+    discard.add_argument("ids", nargs="+")
     sub.add_parser("sync")
     diff = sub.add_parser("diff")
     diff.add_argument("id")
@@ -375,6 +405,8 @@ def main() -> int:
             emit(status_payload())
         elif args.command == "commit":
             emit(commit_ids(args.ids))
+        elif args.command == "discard":
+            emit(discard_ids(args.ids))
         elif args.command == "sync":
             emit(sync_repo())
         elif args.command == "diff":

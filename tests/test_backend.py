@@ -99,6 +99,19 @@ class BackendIntegrationTest(unittest.TestCase):
         self.assertEqual(changed, {".config/a.conf", ".config/b.conf"})
         self.assertEqual(self.run_yadm("rev-list", "--count", f"{before}..HEAD").stdout.strip(), "1")
 
+    def test_discard_restores_file_and_writes_recovery_patch(self):
+        original = (self.home / ".config/a.conf").read_text()
+        (self.home / ".config/a.conf").write_text("discard me\n")
+        status = self.backend("status")
+        a_id = next(item["id"] for item in status["files"] if item["path"] == ".config/a.conf")
+        result = self.backend("discard", a_id)
+        self.assertTrue(result["ok"])
+        self.assertEqual((self.home / ".config/a.conf").read_text(), original)
+        backup = Path(result["backup"])
+        self.assertTrue(backup.is_file())
+        self.assertIn("discard me", backup.read_text())
+        self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
+
 
 if __name__ == "__main__":
     unittest.main()
