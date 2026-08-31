@@ -361,25 +361,43 @@ def diff_payload(entry_id: str) -> dict[str, Any]:
     if not matching:
         raise BackendError("That file is no longer changed")
     entry = matching[0]
-    raw = yadm("diff", "HEAD", "--", *entry["paths"]).stdout
+    raw = yadm("diff", "HEAD", "--unified=0", "--", *entry["paths"]).stdout
     source_lines = raw.splitlines()
-    truncated = len(source_lines) > 5000 or len(raw.encode()) > 1_000_000
+    essential_metadata = (
+        "old mode ",
+        "new mode ",
+        "new file mode ",
+        "deleted file mode ",
+        "rename from ",
+        "rename to ",
+        "Binary files ",
+    )
+    visible_lines: list[dict[str, str]] = []
+    in_hunk = False
+    for line in source_lines:
+        if line.startswith("diff --git "):
+            in_hunk = False
+        elif line.startswith("@@"):
+            in_hunk = True
+        elif in_hunk and line.startswith("+"):
+            visible_lines.append({"text": line, "kind": "add"})
+        elif in_hunk and line.startswith("-"):
+            visible_lines.append({"text": line, "kind": "delete"})
+        elif in_hunk and line == "\\ No newline at end of file":
+            visible_lines.append({"text": line, "kind": "header"})
+        elif line.startswith(essential_metadata):
+            visible_lines.append({"text": line, "kind": "header"})
+
     lines: list[dict[str, str]] = []
     size = 0
-    for line in source_lines[:5000]:
-        size += len(line.encode()) + 1
-        if size > 1_000_000:
+    truncated = False
+    for line in visible_lines:
+        line_size = len(line["text"].encode()) + 1
+        if len(lines) >= 5000 or size + line_size > 1_000_000:
+            truncated = True
             break
-        kind = "context"
-        if line.startswith("@@"):
-            kind = "hunk"
-        elif line.startswith("+") and not line.startswith("+++"):
-            kind = "add"
-        elif line.startswith("-") and not line.startswith("---"):
-            kind = "delete"
-        elif line.startswith("diff ") or line.startswith("index ") or line.startswith("+++") or line.startswith("---"):
-            kind = "header"
-        lines.append({"text": line, "kind": kind})
+        size += line_size
+        lines.append(line)
     return {"ok": True, "file": entry, "lines": lines, "truncated": truncated}
 
 
