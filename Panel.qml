@@ -363,11 +363,27 @@ Panel {
                   anchors.rightMargin: Style.space(10)
                   spacing: Style.space(8)
 
-                  Text {
-                    text: root.containsSelected(fileRow.modelData.id) ? "☑" : "□"
-                    color: root.containsSelected(fileRow.modelData.id) ? Color.accent : root.dim
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.icon
+                  Item {
+                    Layout.preferredWidth: checkbox.implicitWidth + Style.space(4)
+                    Layout.preferredHeight: checkbox.implicitHeight + Style.space(4)
+
+                    Text {
+                      id: checkbox
+                      anchors.centerIn: parent
+                      text: root.containsSelected(fileRow.modelData.id) ? "☑" : "□"
+                      color: root.containsSelected(fileRow.modelData.id) ? Color.accent : root.dim
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.icon
+                    }
+
+                    MouseArea {
+                      anchors.fill: parent
+                      acceptedButtons: Qt.LeftButton
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onEntered: { root.cursorActive = true; root.fileIndex = fileRow.index }
+                      onClicked: root.toggleSelected(fileRow.modelData.id)
+                    }
                   }
                   ColumnLayout {
                     Layout.fillWidth: true
