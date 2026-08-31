@@ -19,10 +19,15 @@ Panel {
   property var pendingIds: []
   property var commitQueue: []
   property var activeCommitIds: []
+  property var settlingIds: []
   property var diffData: ({})
   property bool diffView: false
   property bool loading: false
   property bool syncing: false
+  property bool refreshPending: false
+  property int statusGeneration: 0
+  property int activeStatusGeneration: 0
+  property int settleAfterGeneration: 0
   property string errorText: ""
   property string branch: ""
   property int ahead: 0
@@ -50,7 +55,7 @@ Panel {
     catch (e) { return { ok: false, error: "Invalid qs-yadm backend response" } }
   }
 
-  function applyStatus(data) {
+  function applyStatus(data, generation) {
     if (!data || data.ok !== true) {
       errorText = String(data && data.error ? data.error : "Could not read yadm status")
       return
@@ -69,11 +74,25 @@ Panel {
         if (files[j].id === selectedIds[i] && kept.indexOf(selectedIds[i]) === -1) kept.push(selectedIds[i])
     selectedIds = kept
     if (fileIndex >= visibleFiles.length) fileIndex = Math.max(0, visibleFiles.length - 1)
+    // A completed commit stays optimistically hidden until a status request
+    // started after that commit has landed. Releasing it against the previous
+    // status snapshot caused a one-frame flash of the stale file row.
+    if (settlingIds.length > 0 && generation >= settleAfterGeneration) {
+      var settled = settlingIds.slice()
+      pendingIds = pendingIds.filter(function(id) { return settled.indexOf(id) === -1 })
+      settlingIds = []
+      settleAfterGeneration = 0
+    }
   }
 
   function refresh() {
-    if (statusProcess.running) return
+    if (statusProcess.running) {
+      refreshPending = true
+      return
+    }
     loading = true
+    statusGeneration += 1
+    activeStatusGeneration = statusGeneration
     statusProcess.command = ["python3", backendPath, "status"]
     statusProcess.running = true
   }
@@ -122,7 +141,11 @@ Panel {
 
   function finishCommit() {
     var completed = activeCommitIds.slice()
-    pendingIds = pendingIds.filter(function(id) { return completed.indexOf(id) === -1 })
+    var settling = settlingIds.slice()
+    for (var i = 0; i < completed.length; i++)
+      if (settling.indexOf(completed[i]) === -1) settling.push(completed[i])
+    settlingIds = settling
+    settleAfterGeneration = statusGeneration + 1
     activeCommitIds = []
     refresh()
     Qt.callLater(startNextCommit)
@@ -549,7 +572,11 @@ Panel {
     stdout: StdioCollector { id: statusOutput; waitForEnd: true }
     onExited: function(exitCode) {
       root.loading = false
-      root.applyStatus(root.parse(statusOutput.text))
+      root.applyStatus(root.parse(statusOutput.text), root.activeStatusGeneration)
+      if (root.refreshPending) {
+        root.refreshPending = false
+        Qt.callLater(root.refresh)
+      }
     }
   }
   Process {
