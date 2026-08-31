@@ -237,8 +237,15 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       onMoveRequested: function(dx, dy) {
-        if (root.diffView) return
+        if (root.diffView) {
+          if (dx < 0) root.diffView = false
+          return
+        }
         root.cursorActive = true
+        if (dx > 0 && root.visibleFiles.length > 0) {
+          root.showDiff(root.visibleFiles[Math.max(0, Math.min(root.fileIndex, root.visibleFiles.length - 1))].id)
+          return
+        }
         root.fileIndex = Math.max(0, Math.min(root.visibleFiles.length - 1, root.fileIndex + dy))
       }
       // PanelKeyCatcher emits returnRequested and activateRequested for Enter,
