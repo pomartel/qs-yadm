@@ -361,7 +361,7 @@ def diff_payload(entry_id: str) -> dict[str, Any]:
     if not matching:
         raise BackendError("That file is no longer changed")
     entry = matching[0]
-    raw = yadm("diff", "HEAD", "--unified=0", "--", *entry["paths"]).stdout
+    raw = yadm("diff", "HEAD", "--unified=2", "--", *entry["paths"]).stdout
     source_lines = raw.splitlines()
     essential_metadata = (
         "old mode ",
@@ -383,6 +383,8 @@ def diff_payload(entry_id: str) -> dict[str, Any]:
             visible_lines.append({"text": line, "kind": "add"})
         elif in_hunk and line.startswith("-"):
             visible_lines.append({"text": line, "kind": "delete"})
+        elif in_hunk and line.startswith(" "):
+            visible_lines.append({"text": line, "kind": "context"})
         elif in_hunk and line == "\\ No newline at end of file":
             visible_lines.append({"text": line, "kind": "header"})
         elif line.startswith(essential_metadata):

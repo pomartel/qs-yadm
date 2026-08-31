@@ -72,20 +72,23 @@ class BackendIntegrationTest(unittest.TestCase):
         self.assertEqual(status["files"][0]["added"], 1)
         self.assertEqual(status["files"][0]["deleted"], 0)
 
-    def test_diff_returns_only_changed_lines(self):
+    def test_diff_returns_changed_lines_with_two_lines_of_context(self):
         path = self.home / ".config/a.conf"
-        path.write_text("top\nold\nbottom\n")
+        path.write_text("outside top\ntop one\ntop two\nold\nbottom one\nbottom two\noutside bottom\n")
         self.run_yadm("add", ".config/a.conf")
         self.run_yadm("commit", "-m", "Add diff fixture")
-        path.write_text("top\nnew\nbottom\n")
+        path.write_text("outside top\ntop one\ntop two\nnew\nbottom one\nbottom two\noutside bottom\n")
 
         status = self.backend("status")
         entry_id = next(item["id"] for item in status["files"] if item["path"] == ".config/a.conf")
         result = self.backend("diff", entry_id)
         texts = [line["text"] for line in result["lines"]]
 
-        self.assertEqual(texts, ["-old", "+new"])
-        self.assertFalse(any(line["kind"] in {"context", "hunk"} for line in result["lines"]))
+        self.assertEqual(
+            texts,
+            [" top one", " top two", "-old", "+new", " bottom one", " bottom two"],
+        )
+        self.assertFalse(any(line["kind"] == "hunk" for line in result["lines"]))
 
     def test_single_file_commit_preserves_unrelated_staging_and_pushes(self):
         (self.home / ".config/a.conf").write_text("changed a\n")
