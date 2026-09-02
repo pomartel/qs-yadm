@@ -74,6 +74,26 @@ class AnonymousPullTest(unittest.TestCase):
         )
 
 
+class CodexEnvironmentTest(unittest.TestCase):
+    def test_preserves_inherited_codex_home(self):
+        with mock.patch.dict(os.environ, {"CODEX_HOME": "/custom/codex"}, clear=True):
+            self.assertEqual(
+                backend_module.codex_environment(),
+                {"CODEX_HOME": "/custom/codex"},
+            )
+
+    def test_finds_xdg_codex_login_for_graphical_shell(self):
+        with tempfile.TemporaryDirectory() as temp:
+            candidate = Path(temp) / "codex"
+            candidate.mkdir()
+            (candidate / "auth.json").touch()
+            with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": temp}, clear=True):
+                self.assertEqual(
+                    backend_module.codex_environment(),
+                    {"CODEX_HOME": str(candidate)},
+                )
+
+
 class BackendIntegrationTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
