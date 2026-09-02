@@ -88,6 +88,11 @@ Every minute, qs-yadm runs the equivalent of:
 yadm pull --rebase --autostash origin "$(yadm branch --show-current)"
 ```
 
+For HTTP(S) and standard SSH remotes, qs-yadm first checks whether the repository
+is publicly readable over credential-free HTTP(S). Public repositories are pulled
+anonymously without changing the configured `origin`; private repositories keep
+using the origin's configured SSH key or credential helper.
+
 Repository-changing jobs share a lock, so pulls cannot race commits or pushes.
 When a pull enters a rebase or autostash conflict, the plugin asks Codex to
 resolve only the conflicted yadm files and validates that the repository no

@@ -14,6 +14,7 @@ import sys
 import tempfile
 import time
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 
 HOME = Path(os.environ.get("QS_YADM_HOME", Path.home())).expanduser()
@@ -37,7 +38,16 @@ def run(
     timeout: int = 120,
     input_text: str | None = None,
     cwd: Path | None = None,
+    env_updates: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    env = {
+        **os.environ,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_EDITOR": "true",
+        "GIT_SEQUENCE_EDITOR": "true",
+    }
+    if env_updates:
+        env.update(env_updates)
     proc = subprocess.run(
         args,
         cwd=str(cwd or HOME),
@@ -45,7 +55,7 @@ def run(
         text=True,
         capture_output=True,
         timeout=timeout,
-        env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_EDITOR": "true", "GIT_SEQUENCE_EDITOR": "true"},
+        env=env,
     )
     if check and proc.returncode:
         message = (proc.stderr or proc.stdout or "Command failed").strip()
@@ -93,6 +103,67 @@ class RepoLock:
 
 def branch_name() -> str:
     return yadm("branch", "--show-current").stdout.strip() or "master"
+
+
+def anonymous_https_url(remote_url: str) -> str | None:
+    """Return a credential-free HTTP(S) equivalent for common Git remote URLs."""
+    remote_url = remote_url.strip()
+    try:
+        parsed = urlsplit(remote_url)
+        if parsed.scheme in {"http", "https"} and parsed.hostname:
+            host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+            if parsed.port:
+                host += f":{parsed.port}"
+            return urlunsplit((parsed.scheme, host, parsed.path, parsed.query, ""))
+        if parsed.scheme in {"ssh", "git+ssh"} and parsed.hostname and parsed.port in {None, 22}:
+            return urlunsplit(("https", parsed.hostname, parsed.path, parsed.query, ""))
+        if parsed.scheme:
+            return None
+    except ValueError:
+        return None
+
+    scp_style = re.fullmatch(
+        r"(?:[^@/:]+@)?(?P<host>[A-Za-z0-9.-]+):(?P<path>[^\s]+)",
+        remote_url,
+    )
+    if scp_style:
+        return f"https://{scp_style.group('host')}/{scp_style.group('path').lstrip('/')}"
+    return None
+
+
+def anonymously_accessible(remote_url: str) -> bool:
+    proc = run(
+        [
+            "git",
+            "-c", "credential.helper=",
+            "-c", "core.askPass=/bin/false",
+            "ls-remote", remote_url,
+        ],
+        check=False,
+        timeout=30,
+        env_updates={"GIT_ASKPASS": "/bin/false", "SSH_ASKPASS": "/bin/false"},
+    )
+    return proc.returncode == 0
+
+
+def pull_origin(branch: str) -> subprocess.CompletedProcess[str]:
+    remote_url = yadm("remote", "get-url", "origin").stdout.strip()
+    public_url = anonymous_https_url(remote_url)
+    if public_url and anonymously_accessible(public_url):
+        git_options = [
+            "-c", "credential.helper=",
+            "-c", "core.askPass=/bin/false",
+        ]
+        if public_url != remote_url:
+            git_options += ["-c", f"url.{public_url}.insteadOf={remote_url}"]
+        return yadm(
+            *git_options,
+            "pull", "--rebase", "--autostash", "origin", branch,
+            check=False,
+            timeout=180,
+            env_updates={"GIT_ASKPASS": "/bin/false", "SSH_ASKPASS": "/bin/false"},
+        )
+    return yadm("pull", "--rebase", "--autostash", "origin", branch, check=False, timeout=180)
 
 
 def porcelain_entries() -> list[dict[str, Any]]:
@@ -316,7 +387,7 @@ The pull reported: {original_error[:1500]}
 def sync_repo() -> dict[str, Any]:
     with RepoLock():
         branch = branch_name()
-        pull = yadm("pull", "--rebase", "--autostash", "origin", branch, check=False, timeout=180)
+        pull = pull_origin(branch)
         if pull.returncode:
             detail = (pull.stderr or pull.stdout or "Pull failed").strip()
             if unmerged_paths() or rebase_in_progress():

@@ -6,10 +6,72 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend.py"
+SPEC = importlib.util.spec_from_file_location("qs_yadm_backend", BACKEND)
+assert SPEC and SPEC.loader
+backend_module = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(backend_module)
+
+
+class AnonymousPullTest(unittest.TestCase):
+    def test_converts_ssh_remotes_to_credential_free_https(self):
+        self.assertEqual(
+            backend_module.anonymous_https_url("git@github.com:owner/dotfiles.git"),
+            "https://github.com/owner/dotfiles.git",
+        )
+        self.assertEqual(
+            backend_module.anonymous_https_url("ssh://git@codeberg.org/owner/dotfiles.git"),
+            "https://codeberg.org/owner/dotfiles.git",
+        )
+        self.assertEqual(
+            backend_module.anonymous_https_url("https://token@github.com/owner/dotfiles.git"),
+            "https://github.com/owner/dotfiles.git",
+        )
+        self.assertIsNone(backend_module.anonymous_https_url("/srv/git/dotfiles.git"))
+        self.assertIsNone(backend_module.anonymous_https_url("ssh://git@example.com:2222/dotfiles.git"))
+        self.assertIsNone(backend_module.anonymous_https_url("https://[invalid/dotfiles.git"))
+
+    @mock.patch.object(backend_module, "anonymously_accessible", return_value=True)
+    @mock.patch.object(backend_module, "yadm")
+    def test_public_remote_is_pulled_anonymously_without_changing_origin(self, yadm, _accessible):
+        yadm.side_effect = [
+            subprocess.CompletedProcess([], 0, stdout="git@github.com:owner/dotfiles.git\n"),
+            subprocess.CompletedProcess([], 0),
+        ]
+
+        backend_module.pull_origin("main")
+
+        pull_args = yadm.call_args_list[1].args
+        pull_kwargs = yadm.call_args_list[1].kwargs
+        self.assertIn("credential.helper=", pull_args)
+        self.assertIn(
+            "url.https://github.com/owner/dotfiles.git.insteadOf=git@github.com:owner/dotfiles.git",
+            pull_args,
+        )
+        self.assertEqual(pull_args[-5:], ("pull", "--rebase", "--autostash", "origin", "main"))
+        self.assertEqual(pull_kwargs["env_updates"]["GIT_ASKPASS"], "/bin/false")
+
+    @mock.patch.object(backend_module, "anonymously_accessible", return_value=False)
+    @mock.patch.object(backend_module, "yadm")
+    def test_private_remote_falls_back_to_configured_origin(self, yadm, _accessible):
+        yadm.side_effect = [
+            subprocess.CompletedProcess([], 0, stdout="git@github.com:owner/private.git\n"),
+            subprocess.CompletedProcess([], 0),
+        ]
+
+        backend_module.pull_origin("main")
+
+        self.assertEqual(
+            yadm.call_args_list[1],
+            mock.call(
+                "pull", "--rebase", "--autostash", "origin", "main",
+                check=False, timeout=180,
+            ),
+        )
 
 
 class BackendIntegrationTest(unittest.TestCase):
