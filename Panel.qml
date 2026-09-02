@@ -590,26 +590,35 @@ Panel {
                 Layout.fillWidth: true
               }
             }
-            Repeater {
-              model: root.diffData.lines || []
-              delegate: Rectangle {
-                required property var modelData
-                width: parent.width
-                implicitHeight: diffLine.implicitHeight + Style.space(2)
-                color: modelData.kind === "add" ? Qt.rgba(0.2, 0.7, 0.35, 0.14)
-                  : modelData.kind === "delete" ? Qt.rgba(0.9, 0.25, 0.25, 0.14)
-                  : modelData.kind === "hunk" ? Qt.rgba(0.3, 0.5, 0.9, 0.14) : "transparent"
-                Text {
-                  id: diffLine
+            Column {
+              width: parent.width
+              spacing: 0
+
+              Repeater {
+                model: root.diffData.lines || []
+                delegate: Rectangle {
+                  required property var modelData
+                  readonly property bool contentLine: modelData.kind === "add"
+                    || modelData.kind === "delete" || modelData.kind === "context"
                   width: parent.width
-                  text: String(parent.modelData.text)
-                  color: parent.modelData.kind === "add" ? "#6aa56a"
-                    : parent.modelData.kind === "delete" ? root.urgent
-                    : parent.modelData.kind === "hunk" ? Color.accent : root.foreground
-                  font.family: "monospace"
-                  font.pixelSize: Style.font.caption
-                  wrapMode: Text.WrapAnywhere
-                  textFormat: Text.PlainText
+                  implicitHeight: diffLine.implicitHeight + Style.space(2)
+                  color: modelData.kind === "add" ? Qt.rgba(0.2, 0.7, 0.35, 0.14)
+                    : modelData.kind === "delete" ? Qt.rgba(0.9, 0.25, 0.25, 0.14)
+                    : modelData.kind === "hunk" ? Qt.rgba(0.3, 0.5, 0.9, 0.14) : "transparent"
+                  Text {
+                    id: diffLine
+                    width: parent.width
+                    text: parent.contentLine
+                      ? String(parent.modelData.text).substring(1)
+                      : String(parent.modelData.text)
+                    color: parent.modelData.kind === "add" ? "#6aa56a"
+                      : parent.modelData.kind === "delete" ? root.urgent
+                      : parent.modelData.kind === "hunk" ? Color.accent : root.foreground
+                    font.family: "monospace"
+                    font.pixelSize: Style.font.caption
+                    wrapMode: Text.WrapAnywhere
+                    textFormat: Text.PlainText
+                  }
                 }
               }
             }
