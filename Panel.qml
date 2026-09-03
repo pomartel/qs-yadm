@@ -358,7 +358,7 @@ Panel {
           event.accepted = true
           return
         }
-        if ((event.text === "o" || event.text === "O") && !root.diffView) {
+        if ((event.text === "e" || event.text === "E" || event.text === "o" || event.text === "O") && !root.diffView) {
           root.openCurrentFile()
           event.accepted = true
           return

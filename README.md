@@ -64,7 +64,7 @@ o.bind("SUPER + CTRL + Y", "Yadm", "omarchy-shell shell toggle qs-yadm")
 | Space | Toggle the focused file in the batch selection |
 | Enter | Commit selected files together, or commit the focused file |
 | Right-click file / `d` | Open its diff viewer |
-| `o` | Open the focused file in the Omarchy default editor |
+| `e` / `o` | Open the focused file in the Omarchy default editor |
 | `x` | Discard the focused file's changes after saving a recovery patch |
 | Up / Down | Move through changed files |
 | Right | Open the focused file's diff |
