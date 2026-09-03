@@ -478,9 +478,9 @@ Panel {
                   cursorShape: Qt.PointingHandCursor
                   onEntered: { root.cursorActive = true; root.fileIndex = fileRow.index }
                   onClicked: function(mouse) {
+                    root.cursorActive = true
                     root.fileIndex = fileRow.index
                     if (mouse.button === Qt.RightButton) root.enqueueCommit([fileRow.modelData.id])
-                    else root.toggleSelected(fileRow.modelData.id)
                   }
                 }
 
