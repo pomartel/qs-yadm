@@ -479,9 +479,8 @@ Panel {
                   onEntered: { root.cursorActive = true; root.fileIndex = fileRow.index }
                   onClicked: function(mouse) {
                     root.fileIndex = fileRow.index
-                    if (mouse.button === Qt.RightButton) root.showDiff(fileRow.modelData.id)
-                    else if (mouse.modifiers & Qt.ControlModifier) root.toggleSelected(fileRow.modelData.id)
-                    else root.enqueueCommit([fileRow.modelData.id])
+                    if (mouse.button === Qt.RightButton) root.enqueueCommit([fileRow.modelData.id])
+                    else root.toggleSelected(fileRow.modelData.id)
                   }
                 }
 
